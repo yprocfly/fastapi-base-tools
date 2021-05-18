@@ -15,8 +15,11 @@ with open("README.md", "r") as fh:
 
 
 def read_requirements(filename):
-    return [line.strip() for line in read_file(filename).splitlines()
-          if not line.startswith('#')]
+    return [
+        line.strip() 
+        for line in read_file(filename).splitlines() 
+        if not line.startswith('#')
+    ]
 
 
 setuptools.setup(
