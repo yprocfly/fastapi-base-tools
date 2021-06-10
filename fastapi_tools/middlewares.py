@@ -21,22 +21,14 @@ class SimpleBaseMiddleware:
         await response(request.scope, request.receive, send)
         await self.after_request(request)
 
-    async def get_receive(self, request):
-        """获取请求receive"""
-        message = await request.receive()
-
-        async def _receive():
-            return message
-
-        request._receive = _receive
-        return message
-
     async def get_body(self, request):
         """获取请求BODY"""
-        message = await self.get_receive(request)
-        if message['type'] == 'http.request':
-            return message.get('body', b"")
-        return b""
+        async def _receive():
+            return {"type": "http.request", "body": body}
+
+        body = await request.body()
+        request._receive = _receive
+        return body
 
     async def before_request(self, request: Request) -> [Response, None]:
         """如果需要修改请求信息，可直接重写此方法"""
