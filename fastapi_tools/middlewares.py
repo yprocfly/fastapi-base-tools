@@ -1,7 +1,16 @@
 import functools
+import json
+
+from starlette.datastructures import FormData
+from starlette.formparsers import MultiPartParser, FormParser
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send, Message
+
+try:
+    from multipart.multipart import parse_options_header
+except ImportError:  # pragma: nocover
+    parse_options_header = None
 
 
 class SimpleBaseMiddleware:
@@ -29,6 +38,37 @@ class SimpleBaseMiddleware:
         body = await request.body()
         request._receive = _receive
         return body
+
+    async def get_json(self, request):
+        """获取json请求参数"""
+        return json.loads(await self.get_body(request))
+
+    async def get_form(self, request):
+        """获取请求表单[以字典方式返回]"""
+        body = await self.get_body(request)
+
+        content_type_header = request.headers.get("Content-Type")
+        content_type, options = parse_options_header(content_type_header)
+        if content_type == b"multipart/form-data":
+            multipart_parser = MultiPartParser(request.headers, request.stream())
+            form_data = await multipart_parser.parse()
+        elif content_type == b"application/x-www-form-urlencoded":
+            form_parser = FormParser(request.headers, request.stream())
+            form_data = await form_parser.parse()
+        else:
+            form_data = FormData()
+
+        async def _receive():
+            return {"type": "http.request", "body": body}
+        request._receive = _receive
+        return dict(form_data)
+
+    async def get_body_params(self, request):
+        """获取请求的BODY，以字典形式返回【兼容json和表单方式】"""
+        try:
+            return await self.get_json(request)
+        except:
+            return await self.get_form(request)
 
     async def before_request(self, request: Request) -> [Response, None]:
         """如果需要修改请求信息，可直接重写此方法"""
